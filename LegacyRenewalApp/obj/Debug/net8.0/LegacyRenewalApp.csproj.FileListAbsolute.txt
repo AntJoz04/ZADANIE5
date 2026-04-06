@@ -20,3 +20,4 @@ C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalApp\obj\Debug\net8.0\refint\LegacyRenewalApp.dll
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalApp\obj\Debug\net8.0\LegacyRenewalApp.pdb
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalApp\obj\Debug\net8.0\ref\LegacyRenewalApp.dll
+C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalApp\obj\Debug\net8.0\LegacyRenewalApp.sourcelink.json

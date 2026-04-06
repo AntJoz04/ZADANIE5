@@ -34,3 +34,4 @@ C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalAppConsumer\obj\Debug\net8.0\LegacyRenewalAppConsumer.pdb
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalAppConsumer\obj\Debug\net8.0\LegacyRenewalAppConsumer.genruntimeconfig.cache
 C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalAppConsumer\obj\Debug\net8.0\ref\LegacyRenewalAppConsumer.dll
+C:\Users\antra\Downloads\zadanie_refactoring_renewal\zadanie_refactoring_renewal\LegacyRenewalAppConsumer\obj\Debug\net8.0\LegacyRenewalAppConsumer.sourcelink.json

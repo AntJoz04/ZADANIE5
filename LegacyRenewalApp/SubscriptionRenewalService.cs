@@ -28,6 +28,8 @@ namespace LegacyRenewalApp
             //metoda pomocnicza 2
             return val.Trim().ToUpperInvariant();
         }
+
+        
         //pola do wstrzykiwania później zależnośći
         private readonly ICustomerRepository _customerRepository;
         private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
@@ -38,6 +40,8 @@ namespace LegacyRenewalApp
         private readonly IEnumerable<ISupportFeeStrategy> _supportFeeStrategies;
         private readonly ILoyaltyPointsService _loyaltyPointsService;
         private readonly IMinimumSubtotalPolicy _minimumSubtotalPolicy;
+        private readonly IInvoiceFactory _invoiceFactory;
+        
 
         public SubscriptionRenewalService(
             ICustomerRepository customerRepository,
@@ -48,7 +52,8 @@ namespace LegacyRenewalApp
             IEnumerable<ITaxStrategy> taxStrategies,
             IEnumerable<ISupportFeeStrategy> supportFeeStrategies,
             ILoyaltyPointsService loyaltyPointsService,
-            IMinimumSubtotalPolicy minimumSubtotalPolicy
+            IMinimumSubtotalPolicy minimumSubtotalPolicy,
+            IInvoiceFactory invoiceFactory
             )
         {
             //konsturktor z wsztrzykniętymi zależnościami
@@ -61,6 +66,7 @@ namespace LegacyRenewalApp
             _supportFeeStrategies = supportFeeStrategies;
             _loyaltyPointsService = loyaltyPointsService;
             _minimumSubtotalPolicy=minimumSubtotalPolicy;
+            _invoiceFactory = invoiceFactory;
         }
         public SubscriptionRenewalService()
         //taki konstruktor domyślny by nie zmieniać Program.cs
@@ -97,7 +103,8 @@ namespace LegacyRenewalApp
                     new EnterpriseSupportFeeStrategy()
                 },
                 new LoyaltyPointsService(),
-                new MinimumSubtotalPolicy())
+                new MinimumSubtotalPolicy(),
+                new InvoiceFactory())
         {
         }
         public RenewalInvoice CreateRenewalInvoice(
@@ -177,22 +184,18 @@ namespace LegacyRenewalApp
                 notes += "minimum invoice amount applied; ";
             }
 
-            var invoice = new RenewalInvoice
-            {
-                InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{customerId}-{normalizedPlanCode}",
-                CustomerName = customer.FullName,
-                PlanCode = normalizedPlanCode,
-                PaymentMethod = normalizedPaymentMethod,
-                SeatCount = seatCount,
-                BaseAmount = Math.Round(baseAmount, 2, MidpointRounding.AwayFromZero),
-                DiscountAmount = Math.Round(discountAmount, 2, MidpointRounding.AwayFromZero),
-                SupportFee = Math.Round(supportFee, 2, MidpointRounding.AwayFromZero),
-                PaymentFee = Math.Round(paymentFee, 2, MidpointRounding.AwayFromZero),
-                TaxAmount = Math.Round(taxAmount, 2, MidpointRounding.AwayFromZero),
-                FinalAmount = Math.Round(finalAmount, 2, MidpointRounding.AwayFromZero),
-                Notes = notes.Trim(),
-                GeneratedAt = DateTime.UtcNow
-            };
+            var invoice = _invoiceFactory.Create(customerId,
+                customer,
+                normalizedPlanCode,
+                normalizedPaymentMethod,
+                seatCount,
+                baseAmount,
+                discountAmount,
+                supportFee,
+                paymentFee,
+                taxAmount,
+                finalAmount,
+                notes);
 
             _billingGateway.SaveInvoice(invoice);
 

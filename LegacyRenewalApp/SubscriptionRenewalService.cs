@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+
 
 namespace LegacyRenewalApp
 {
@@ -28,16 +30,31 @@ namespace LegacyRenewalApp
         //pola do wstrzykiwania później zależnośći
         private readonly ICustomerRepository _customerRepository;
         private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
+        private readonly IEnumerable<IDiscountRule> _discountRules;
+        
 
-        public SubscriptionRenewalService(ICustomerRepository customerRepository, ISubscriptionPlanRepository planRepository)
+        public SubscriptionRenewalService(
+            ICustomerRepository customerRepository,
+            ISubscriptionPlanRepository planRepository,
+            IEnumerable<IDiscountRule> discountRules)
         {
-            //Konstruktor z wstrzykniętymi zależnosćiami
+            //konsturktor z wsztrzykniętymi zależnościami
             _customerRepository = customerRepository;
             _subscriptionPlanRepository = planRepository;
+            _discountRules = discountRules;
         }
         public SubscriptionRenewalService()
-        //tak żeby działał Program.cs
-            : this(new CustomerRepository(), new SubscriptionPlanRepository())
+        //taki konstruktor domyślny by nie zmieniać Program.cs
+            : this(
+                new CustomerRepository(),
+                new SubscriptionPlanRepository(),
+                new List<IDiscountRule>
+                {
+                    new SegmentDiscountRule(),
+                    new LoyaltyDiscountRule(),
+                    new SeatCountDiscountRule(),
+                    new LoyaltyPointsDiscountRule()
+                })
         {
         }
         public RenewalInvoice CreateRenewalInvoice(
@@ -61,56 +78,17 @@ namespace LegacyRenewalApp
             }
 
             decimal baseAmount = (plan.MonthlyPricePerSeat * seatCount * 12m) + plan.SetupFee;
+          
             decimal discountAmount = 0m;
             string notes = string.Empty;
 
-            if (customer.Segment == "Silver")
+            foreach (var rule in _discountRules)
             {
-                discountAmount += baseAmount * 0.05m;
-                notes += "silver discount; ";
+                var result = rule.Apply(customer, plan, seatCount, baseAmount);
+                discountAmount += result.Amount;
+                notes += result.Notes;
             }
-            else if (customer.Segment == "Gold")
-            {
-                discountAmount += baseAmount * 0.10m;
-                notes += "gold discount; ";
-            }
-            else if (customer.Segment == "Platinum")
-            {
-                discountAmount += baseAmount * 0.15m;
-                notes += "platinum discount; ";
-            }
-            else if (customer.Segment == "Education" && plan.IsEducationEligible)
-            {
-                discountAmount += baseAmount * 0.20m;
-                notes += "education discount; ";
-            }
-
-            if (customer.YearsWithCompany >= 5)
-            {
-                discountAmount += baseAmount * 0.07m;
-                notes += "long-term loyalty discount; ";
-            }
-            else if (customer.YearsWithCompany >= 2)
-            {
-                discountAmount += baseAmount * 0.03m;
-                notes += "basic loyalty discount; ";
-            }
-
-            if (seatCount >= 50)
-            {
-                discountAmount += baseAmount * 0.12m;
-                notes += "large team discount; ";
-            }
-            else if (seatCount >= 20)
-            {
-                discountAmount += baseAmount * 0.08m;
-                notes += "medium team discount; ";
-            }
-            else if (seatCount >= 10)
-            {
-                discountAmount += baseAmount * 0.04m;
-                notes += "small team discount; ";
-            }
+            
 
             if (useLoyaltyPoints && customer.LoyaltyPoints > 0)
             {

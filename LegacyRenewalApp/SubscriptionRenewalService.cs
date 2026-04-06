@@ -4,6 +4,25 @@ namespace LegacyRenewalApp
 {
     public class SubscriptionRenewalService
     {
+        private void ValidateInput(int customerId, string planCode, int seatCount, string paymentMethod)
+        {
+            if (customerId <= 0)
+                throw new ArgumentException("Customer id must be positive");
+
+            if (string.IsNullOrWhiteSpace(planCode))
+                throw new ArgumentException("Plan code is required");
+
+            if (seatCount <= 0)
+                throw new ArgumentException("Seat count must be positive");
+
+            if (string.IsNullOrWhiteSpace(paymentMethod))
+                throw new ArgumentException("Payment method is required");
+        }
+
+        private string Normalize(string val)
+        {
+            return val.Trim().ToUpperInvariant();
+        }
         public RenewalInvoice CreateRenewalInvoice(
             int customerId,
             string planCode,
@@ -12,28 +31,10 @@ namespace LegacyRenewalApp
             bool includePremiumSupport,
             bool useLoyaltyPoints)
         {
-            if (customerId <= 0)
-            {
-                throw new ArgumentException("Customer id must be positive");
-            }
+            ValidateInput(customerId, planCode, seatCount, paymentMethod);
 
-            if (string.IsNullOrWhiteSpace(planCode))
-            {
-                throw new ArgumentException("Plan code is required");
-            }
-
-            if (seatCount <= 0)
-            {
-                throw new ArgumentException("Seat count must be positive");
-            }
-
-            if (string.IsNullOrWhiteSpace(paymentMethod))
-            {
-                throw new ArgumentException("Payment method is required");
-            }
-
-            string normalizedPlanCode = planCode.Trim().ToUpperInvariant();
-            string normalizedPaymentMethod = paymentMethod.Trim().ToUpperInvariant();
+            string normalizedPlanCode = Normalize(planCode);
+            string normalizedPaymentMethod = Normalize(paymentMethod);
 
             var customerRepository = new CustomerRepository();
             var planRepository = new SubscriptionPlanRepository();

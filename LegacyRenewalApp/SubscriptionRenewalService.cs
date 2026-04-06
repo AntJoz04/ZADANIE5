@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 
 namespace LegacyRenewalApp
@@ -31,17 +32,22 @@ namespace LegacyRenewalApp
         private readonly ICustomerRepository _customerRepository;
         private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
         private readonly IEnumerable<IDiscountRule> _discountRules;
-        
+        private readonly IBillingGateway _billingGateway;
+        private readonly IEnumerable<IPaymentFeeStrategy> _paymentStrategies;
 
         public SubscriptionRenewalService(
             ICustomerRepository customerRepository,
             ISubscriptionPlanRepository planRepository,
-            IEnumerable<IDiscountRule> discountRules)
+            IEnumerable<IDiscountRule> discountRules,
+            IBillingGateway billingGateway,
+            IEnumerable<IPaymentFeeStrategy> paymentStrategies)
         {
             //konsturktor z wsztrzykniętymi zależnościami
             _customerRepository = customerRepository;
             _subscriptionPlanRepository = planRepository;
             _discountRules = discountRules;
+            _billingGateway=billingGateway;
+            _paymentStrategies = paymentStrategies;
         }
         public SubscriptionRenewalService()
         //taki konstruktor domyślny by nie zmieniać Program.cs
@@ -54,6 +60,14 @@ namespace LegacyRenewalApp
                     new LoyaltyDiscountRule(),
                     new SeatCountDiscountRule(),
                     new LoyaltyPointsDiscountRule()
+                },
+                new LegacyBillingGatewayAdapter(),
+                new List<IPaymentFeeStrategy>
+                {
+                    new CardPaymentFeeStrategy(),
+                    new BankTransferFeeStrategy(),
+                    new PaypalFeeStrategy(),
+                    new InvoiceFeeStrategy()
                 })
         {
         }
@@ -124,30 +138,11 @@ namespace LegacyRenewalApp
             }
 
             decimal paymentFee = 0m;
-            if (normalizedPaymentMethod == "CARD")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.02m;
-                notes += "card payment fee; ";
-            }
-            else if (normalizedPaymentMethod == "BANK_TRANSFER")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.01m;
-                notes += "bank transfer fee; ";
-            }
-            else if (normalizedPaymentMethod == "PAYPAL")
-            {
-                paymentFee = (subtotalAfterDiscount + supportFee) * 0.035m;
-                notes += "paypal fee; ";
-            }
-            else if (normalizedPaymentMethod == "INVOICE")
-            {
-                paymentFee = 0m;
-                notes += "invoice payment; ";
-            }
-            else
-            {
-                throw new ArgumentException("Unsupported payment method");
-            }
+            var strategy = _paymentStrategies.FirstOrDefault(s => s.CanHandle(normalizedPaymentMethod));
+            if (strategy == null)
+                throw new Exception("Unsupported payment method");
+            paymentFee = strategy.Calculate(subtotalAfterDiscount + supportFee);
+            notes += strategy.GetNote() + "; ";
 
             decimal taxRate = 0.20m;
             if (customer.Country == "Poland")
@@ -194,7 +189,7 @@ namespace LegacyRenewalApp
                 GeneratedAt = DateTime.UtcNow
             };
 
-            LegacyBillingGateway.SaveInvoice(invoice);
+            _billingGateway.SaveInvoice(invoice);
 
             if (!string.IsNullOrWhiteSpace(customer.Email))
             {
@@ -203,7 +198,7 @@ namespace LegacyRenewalApp
                     $"Hello {customer.FullName}, your renewal for plan {normalizedPlanCode} " +
                     $"has been prepared. Final amount: {invoice.FinalAmount:F2}.";
 
-                LegacyBillingGateway.SendEmail(customer.Email, subject, body);
+                _billingGateway.SendEmail(customer.Email, subject, body);
             }
 
             return invoice;

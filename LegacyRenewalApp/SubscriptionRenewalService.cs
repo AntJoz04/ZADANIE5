@@ -6,6 +6,7 @@ namespace LegacyRenewalApp
     {
         private void ValidateInput(int customerId, string planCode, int seatCount, string paymentMethod)
         {
+            //metoda pomocnicza 1
             if (customerId <= 0)
                 throw new ArgumentException("Customer id must be positive");
 
@@ -21,7 +22,23 @@ namespace LegacyRenewalApp
 
         private string Normalize(string val)
         {
+            //metoda pomocnicza 2
             return val.Trim().ToUpperInvariant();
+        }
+        //pola do wstrzykiwania później zależnośći
+        private readonly ICustomerRepository _customerRepository;
+        private readonly ISubscriptionPlanRepository _subscriptionPlanRepository;
+
+        public SubscriptionRenewalService(ICustomerRepository customerRepository, ISubscriptionPlanRepository planRepository)
+        {
+            //Konstruktor z wstrzykniętymi zależnosćiami
+            _customerRepository = customerRepository;
+            _subscriptionPlanRepository = planRepository;
+        }
+        public SubscriptionRenewalService()
+        //tak żeby działał Program.cs
+            : this(new CustomerRepository(), new SubscriptionPlanRepository())
+        {
         }
         public RenewalInvoice CreateRenewalInvoice(
             int customerId,
@@ -36,12 +53,8 @@ namespace LegacyRenewalApp
             string normalizedPlanCode = Normalize(planCode);
             string normalizedPaymentMethod = Normalize(paymentMethod);
 
-            var customerRepository = new CustomerRepository();
-            var planRepository = new SubscriptionPlanRepository();
-
-            var customer = customerRepository.GetById(customerId);
-            var plan = planRepository.GetByCode(normalizedPlanCode);
-
+            var customer = _customerRepository.GetById(customerId);
+            var plan = _subscriptionPlanRepository.GetByCode(normalizedPlanCode);
             if (!customer.IsActive)
             {
                 throw new InvalidOperationException("Inactive customers cannot renew subscriptions");

@@ -25,5 +25,5 @@ namespace LegacyRenewalAppConsumer
             Console.WriteLine(invoice);
             Console.WriteLine($"Final amount: {invoice.FinalAmount:F2}");
         }
-    }//test
+    }
 }

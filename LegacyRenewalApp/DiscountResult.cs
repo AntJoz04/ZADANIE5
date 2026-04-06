@@ -1,4 +1,6 @@
-﻿namespace LegacyRenewalApp;
+﻿using System;
+
+namespace LegacyRenewalApp;
 
 public class DiscountResult
 {
@@ -86,19 +88,4 @@ public class SeatCountDiscountRule : IDiscountRule
         return result;
     }
 }
-public class LoyaltyPointsDiscountRule : IDiscountRule
-{
-    public DiscountResult Apply(Customer customer, SubscriptionPlan plan, int seatCount, decimal baseAmount)
-    {
-        var result = new DiscountResult();
 
-        if (customer.LoyaltyPoints > 0)
-        {
-            int pointsToUse = customer.LoyaltyPoints > 200 ? 200 : customer.LoyaltyPoints;
-            result.Amount = pointsToUse;
-            result.Notes = $"loyalty points used: {pointsToUse}; ";
-        }
-
-        return result;
-    }
-}

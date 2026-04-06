@@ -34,13 +34,22 @@ namespace LegacyRenewalApp
         private readonly IEnumerable<IDiscountRule> _discountRules;
         private readonly IBillingGateway _billingGateway;
         private readonly IEnumerable<IPaymentFeeStrategy> _paymentStrategies;
+        private readonly IEnumerable<ITaxStrategy> _taxStrategies;
+        private readonly IEnumerable<ISupportFeeStrategy> _supportFeeStrategies;
+        private readonly ILoyaltyPointsService _loyaltyPointsService;
+        private readonly IMinimumSubtotalPolicy _minimumSubtotalPolicy;
 
         public SubscriptionRenewalService(
             ICustomerRepository customerRepository,
             ISubscriptionPlanRepository planRepository,
             IEnumerable<IDiscountRule> discountRules,
             IBillingGateway billingGateway,
-            IEnumerable<IPaymentFeeStrategy> paymentStrategies)
+            IEnumerable<IPaymentFeeStrategy> paymentStrategies,
+            IEnumerable<ITaxStrategy> taxStrategies,
+            IEnumerable<ISupportFeeStrategy> supportFeeStrategies,
+            ILoyaltyPointsService loyaltyPointsService,
+            IMinimumSubtotalPolicy minimumSubtotalPolicy
+            )
         {
             //konsturktor z wsztrzykniętymi zależnościami
             _customerRepository = customerRepository;
@@ -48,6 +57,10 @@ namespace LegacyRenewalApp
             _discountRules = discountRules;
             _billingGateway=billingGateway;
             _paymentStrategies = paymentStrategies;
+            _taxStrategies = taxStrategies;
+            _supportFeeStrategies = supportFeeStrategies;
+            _loyaltyPointsService = loyaltyPointsService;
+            _minimumSubtotalPolicy=minimumSubtotalPolicy;
         }
         public SubscriptionRenewalService()
         //taki konstruktor domyślny by nie zmieniać Program.cs
@@ -59,7 +72,7 @@ namespace LegacyRenewalApp
                     new SegmentDiscountRule(),
                     new LoyaltyDiscountRule(),
                     new SeatCountDiscountRule(),
-                    new LoyaltyPointsDiscountRule()
+                    
                 },
                 new LegacyBillingGatewayAdapter(),
                 new List<IPaymentFeeStrategy>
@@ -68,7 +81,23 @@ namespace LegacyRenewalApp
                     new BankTransferFeeStrategy(),
                     new PaypalFeeStrategy(),
                     new InvoiceFeeStrategy()
-                })
+                },
+                new List<ITaxStrategy>
+                {
+                    new PolandTaxStrategy(),
+                    new GermanyTaxStrategy(),
+                    new CzechTaxStrategy(),
+                    new NorwayTaxStrategy(),
+                    new DefaultTaxStrategy()
+                },
+                new List<ISupportFeeStrategy>
+                {
+                    new StartSupportFeeStrategy(),
+                    new ProSupportFeeStrategy(),
+                    new EnterpriseSupportFeeStrategy()
+                },
+                new LoyaltyPointsService(),
+                new MinimumSubtotalPolicy())
         {
         }
         public RenewalInvoice CreateRenewalInvoice(
@@ -104,36 +133,25 @@ namespace LegacyRenewalApp
             }
             
 
-            if (useLoyaltyPoints && customer.LoyaltyPoints > 0)
-            {
-                int pointsToUse = customer.LoyaltyPoints > 200 ? 200 : customer.LoyaltyPoints;
-                discountAmount += pointsToUse;
-                notes += $"loyalty points used: {pointsToUse}; ";
-            }
+            decimal pointsToUse = _loyaltyPointsService.CalculateDiscount(customer, useLoyaltyPoints);
 
-            decimal subtotalAfterDiscount = baseAmount - discountAmount;
-            if (subtotalAfterDiscount < 300m)
-            {
-                subtotalAfterDiscount = 300m;
-                notes += "minimum discounted subtotal applied; ";
-            }
+            discountAmount += pointsToUse;
+
+            if (pointsToUse > 0)
+                notes += _loyaltyPointsService.GetNotes((int)pointsToUse);
+
+            decimal originalSubtotal = baseAmount - discountAmount;
+
+            decimal subtotalAfterDiscount = _minimumSubtotalPolicy.Apply(originalSubtotal);
+
+            notes += _minimumSubtotalPolicy.GetNote(originalSubtotal, subtotalAfterDiscount);
 
             decimal supportFee = 0m;
+
             if (includePremiumSupport)
             {
-                if (normalizedPlanCode == "START")
-                {
-                    supportFee = 250m;
-                }
-                else if (normalizedPlanCode == "PRO")
-                {
-                    supportFee = 400m;
-                }
-                else if (normalizedPlanCode == "ENTERPRISE")
-                {
-                    supportFee = 700m;
-                }
-
+                var strateg = _supportFeeStrategies.First(s => s.CanHandle(normalizedPlanCode));
+                supportFee = strateg.CalculateFee();
                 notes += "premium support included; ";
             }
 
@@ -144,23 +162,10 @@ namespace LegacyRenewalApp
             paymentFee = strategy.Calculate(subtotalAfterDiscount + supportFee);
             notes += strategy.GetNote() + "; ";
 
-            decimal taxRate = 0.20m;
-            if (customer.Country == "Poland")
-            {
-                taxRate = 0.23m;
-            }
-            else if (customer.Country == "Germany")
-            {
-                taxRate = 0.19m;
-            }
-            else if (customer.Country == "Czech Republic")
-            {
-                taxRate = 0.21m;
-            }
-            else if (customer.Country == "Norway")
-            {
-                taxRate = 0.25m;
-            }
+            var taxStrategy = _taxStrategies.FirstOrDefault(s => s.CanHandle(customer.Country))
+                              ?? new DefaultTaxStrategy();
+
+            decimal taxRate = taxStrategy.GetTaxRate();
 
             decimal taxBase = subtotalAfterDiscount + supportFee + paymentFee;
             decimal taxAmount = taxBase * taxRate;
